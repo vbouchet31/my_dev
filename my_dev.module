@@ -7,65 +7,18 @@
  * Implements hook_form_FORM_ID_alter().
  */
 function my_dev_form_field_ui_field_overview_form_alter(&$form, &$form_state) {
-  $bundle = $form['#bundle'];
-  $entity_type = $form['#entity_type'];
+  module_load_include('inc', 'my_dev', 'my_dev.field');
 
-  $info = array();
-  $hidden_fields = array();
   $field_types = field_info_field_types();
 
-  foreach (field_info_instances() as $existing_entity_type => $bundles) {
-    foreach ($bundles as $existing_bundle => $instances) {
-      // No need to look in the current bundle.
-      if (!($existing_bundle == $bundle && $existing_entity_type == $entity_type)) {
-        foreach ($instances as $instance) {
-          $field = field_info_field($instance['field_name']);
-          // Don't show
-          // - locked fields,
-          // - fields already in the current bundle,
-          // - fields that cannot be added to the entity type,
-          // - fields that should not be added via user interface.
+  $existing_field_options = $form['fields']['_add_existing_field']['field_name']['#options'];
+  foreach (_my_dev_get_orphan_field_base() as $field_name => $field_info) {
+    drupal_set_message(t('Field @field_name has only a field base without any field instance', array('@field_name' => $field_name)), 'warning');
 
-          if (empty($field['locked'])
-            && !field_info_instance($entity_type, $field['field_name'], $bundle)
-            && (empty($field['entity_types']) || in_array($entity_type, $field['entity_types']))
-            && empty($field_types[$field['type']]['no_ui'])) {
-            $info[$instance['field_name']] = array(
-              'type' => $field['type'],
-              'type_label' => $field_types[$field['type']]['label'],
-              'field' => $field['field_name'],
-              'label' => $instance['label'],
-              'widget_type' => $instance['widget']['type'],
-            );
-          }
-          else {
-            $hidden_fields[$field['field_name']] = $field['field_name'];
-          }
-        }
-      }
-    }
-  }
-
-  foreach (field_info_fields() as $field_name => $field_info) {
-    if (!isset($info[$field_name]) && !isset($hidden_fields[$field_name]) && (!isset($field_info['bundles'][$entity_type]) || !in_array($bundle, $field_info['bundles'][$entity_type]))) {
-      $info[$field_name] = array(
-        'type' => $field_info['type'],
-        'type_label' => $field_types[$field_info['type']]['label'],
-        'field' => $field_name,
-        'label' => '',
-        'widget_type' => 0,
-      );
-
-      drupal_set_message(t('Field @field_name has only a field base without any field instance', array('@field_name' => $field_name)), 'warning');
-    }
-  }
-
-  $existing_field_options = array();
-  foreach ($info as $field_name => $field_info) {
     $text = t('@type: @field (@label)', array(
-      '@type' => $field_info['type_label'],
-      '@label' => $field_info['label'],
-      '@field' => $field_info['field'],
+      '@type' => $field_types[$field_info['type']]['label'],
+      '@label' => '',
+      '@field' => $field_name,
     ));
     $existing_field_options[$field_name] = truncate_utf8($text, 80, FALSE, TRUE);
   }
@@ -81,4 +34,10 @@ function watchdog_printr($type, $variable) {
   watchdog($type, '<pre>' . print_r($variable, true) . '</pre>');
 }
 
-// @TODO: Create a function to list field without any field_instance.
+/**
+ * Implements hook_menu_alter().
+ */
+function my_dev_menu_alter(&$items) {
+  $items['admin/reports/fields']['page callback'] = 'my_dev_field_ui_fields_list';
+  $items['admin/reports/fields']['file'] = 'my_dev.field.inc';
+}
