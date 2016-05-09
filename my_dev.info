@@ -1,0 +1,4 @@
+name = My Dev
+description = "Custom utilities function"
+core = 7.x
+package = Custom
